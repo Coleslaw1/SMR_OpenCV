@@ -1,18 +1,27 @@
 import cv2 
 import matplotlib as plt
 import numpy as np
+from matplotlib import pyplot as plt
 
-BoltNo = 8
+BoltNo = 20
 img = cv2.imread(f'Bolts/Bolt{BoltNo}.jpg',1)
-ö
+
+def nothing(x):
+    pass
+
+def histogram(img):
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    plt.hist(gray.ravel(),256,[0,256]); plt.show()
+
 def create_mask(img):
     #Create a mask filtering al reds and other colours
     blur = cv2.blur(img,(5,5))
     img_hsv=cv2.cvtColor(blur, cv2.COLOR_BGR2HSV)
-    lower = np.array([155,25,0])
-    upper = np.array([240,255,255])
+    lower = np.array([50,90,1])
+    upper = np.array([200,255,255])
     red_mask = cv2.inRange(img_hsv, lower, upper)
     result = cv2.bitwise_and(img, img, mask=red_mask)
+    histogram(result)
     return result
 
 def color_filter(img_masked):
@@ -20,9 +29,14 @@ def color_filter(img_masked):
     grayImage = cv2.cvtColor(img_masked, cv2.COLOR_BGR2GRAY)
     (thresh, blackAndWhiteImage) = cv2.threshold(grayImage, 70, 255, cv2.THRESH_BINARY)
     blackAndWhiteImage = cv2.bitwise_not(blackAndWhiteImage)
-    kernel = np.ones((10,10),np.uint8)
-    blackAndWhiteImage = cv2.dilate(blackAndWhiteImage,kernel,iterations = 3)
-    return blackAndWhiteImage, thresh
+    # Define the structuring element
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(5,5))
+    # Apply the opening operation
+    opening = cv2.morphologyEx(blackAndWhiteImage, cv2.MORPH_OPEN, kernel)
+    # Apply the closing operation
+    closing = cv2.morphologyEx(opening, cv2.MORPH_CLOSE, kernel)
+    #blackAndWhiteImage = cv2.dilate(blackAndWhiteImage,kernel,iterations = 3)
+    return closing, thresh
 
 def resize(scale_percent, mask):
     #Used to resize the original image (laod of pixels) to a smaller (or bigger) size
@@ -59,7 +73,8 @@ def draw_edges(cnt, img_form, cx, cy):
     box = cv2.boxPoints(rect) 
     box = np.int0(box)
     
-    img_contours = cv2.drawContours(img_form,[box],0,(255,255,255),2)
+    img_contours = cv2.drawContours(img_form,[box],0,(255,255,255),2) 
+    img_contours = cv2.drawContours(img_form, contours, -1, (0,255,0), 3)
     cv2.circle(img_contours, (cx, cy), 8, (255, 255, 255), -1)
     return img_contours
     
@@ -74,13 +89,15 @@ def run_through_dataset():
     for BoltNo in range (1,22):
         try:
             img = cv2.imread(f'Bolts/Bolt{BoltNo}.jpg',1)
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            plt.hist(gray.ravel(),256,[0,256]); plt.show()
             img_form = resize(20, img)
             Masked = create_mask(img_form)    
             BandW, thresh = color_filter(Masked)
             canny_edges = canny_edge(BandW)
             contours, hierarchy = find_contours(canny_edges)
             cnt, M, cx, cy, area = extract_data(contours)
-            img_contours = draw_edges(cnt, img_form)  
+            #img_contours = draw_edges(cnt, img_form)  
             print (BoltNo)
         except:
             pass
@@ -92,7 +109,8 @@ canny_edges = canny_edge(BandW)
 contours, hierarchy = find_contours(canny_edges)
 cnt, M, cx, cy, area = extract_data(contours)
 img_contours = draw_edges(cnt, img_form, cx, cy)
-#run_through_dataset()
 
-show(img_contours)
+#show(img_contours)
+
+
 
